@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Page Replacement Visualizer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+
+        .visualization-section {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        margin: 20px 0;
+        font-size: 1.2em;
+        text-align: center;
+    }
+    .frame-table {
+        display: flex;
+        flex-direction: column;
+        flex-direction: column;
+        align-items: center;
+        margin: 20px auto;
+    }
+    
+    .frame-row {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 10px;
+    }
+    
+    .frame-cell {
+        width: 50px;
+        height: 50px;
+        border: 1px solid #fffcfc;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        margin-right: 5px;
+        border-radius: 4px;
+        transition: background-color 0.3s;
+    }
+    
+    /* Reference string row in horizontal layout above the frame table */
+    .reference-row-horizontal {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 0px;
+    }
+    
+    .reference-cell {
+        width: 50px;
+        height: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        margin-right: 5px;
+    }
+    
+    .frame-cell.hit {
+        background-color: #28a745; /* Green for hit */
+        color: white;
+    }
+    
+    .frame-cell.fault {
+        background-color: #dc3545; /* Red for fault */
+        color: white;
+    }
+    
+    .alg-title {
+        margin-top: 20px;
+        text-align: center;
+        font-size: 22px;
+        margin-bottom: 10px;
+    }
+    
+    .result-section {
+        text-align: center;
+        margin-top: 20px;
+        font-size: 1.2em;
+    }
+    
+    .frame-column {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin: 0 10px;
+    }
+    .efficiency-box {
+        border: 1px solid #ccc;
+        padding: 10px;
+        margin: 10px;
+        border-radius: 5px;
+        text-align: center;
+        font-size: 1.2em;
+    }
+    
+    .high-efficiency {
+        background-color: #4CAF50; /* Green */
+        color: white;
+    }
+    
+    .medium-efficiency {
+        background-color: #FFC107; /* Yellow */
+        color: black;
+    }
+    
+    .low-efficiency {
+        background-color: #F44336; /* Red */
+        color: white;
+    }
+    </style>
+    <style>
+        .glass-container {
+            background: rgba(255, 255, 255, 0.05);
+           /* background: rgba(255, 255, 255, 0.1);*/
+            backdrop-filter: blur(10px);
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 4px 6px rgba(255, 255, 255, 0.1);
+            padding: 20px;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white">
+    <div class="max-w-4xl mx-auto my-10 p-6 glass-container">
+        <h1 class="text-3xl font-bold text-center text-green-400">PAGE REPLACEMENT VISUALIZER</h1>
+        
+        <div class="mt-6 space-y-4">
+            <label class="block text-lg">Reference String (comma separated):</label>
+            <input type="text" id="referenceString" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white" placeholder="e.g., 7, 0, 1, 2, 0, 3, 0, 4, 2, 3, 0, 3">
+            
+            <label class="block text-lg">Number of Frames:</label>
+            <input type="number" id="numFrames" min="1" value="3" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white">
+            
+            <button onclick="startSimulation()" class="w-full p-3 bg-green-500 hover:bg-green-600 text-white rounded-lg font-bold">Start Simulation</button>
+        </div>
+        
+        <div class="mt-10 mx-auto space-y-6">
+            <div class="glass-container">
+                <h2 class="text-2xl font-semibold text-yellow-400">FIFO Page Replacement Algorithm</h2>
+                <p class="mt-2 text-gray-100">The First-In-First-Out (FIFO) page replacement algorithm replaces the oldest page in memory when a new page needs to be loaded.</p>
+            </div>
+            <div class="glass-container">
+                <h2 class="text-2xl font-semibold text-blue-400">LRU Page Replacement Algorithm</h2>
+                <p class="mt-2 text-gray-300">The Least Recently Used (LRU) algorithm replaces the page that hasn’t been used for the longest time.</p>
+            </div>
+            <div class="glass-container">
+                <h2 class="text-2xl font-semibold text-red-400">Optimal Page Replacement Algorithm</h2>
+                <p class="mt-2 text-gray-300">The Optimal Page Replacement Algorithm replaces the page that will not be used for the longest period in the future.</p>
+            </div>
+        </div>
+        
+        <div class="mt-10 " id="visualizationSection"></div>
+        <div class="mt-6 " id="resultSection"></div>
+        <div id="efficiencySection" class="efficiency-analysis-section"></div>
+        
+        
+
+        <!--<div class="mt-6 " id="efficiencySection"></div>-->
+    </div>
+    <script>
+        function startSimulation() {
+    const referenceString = document.getElementById("referenceString").value.split(",").map(Number);
+    const numFrames = parseInt(document.getElementById("numFrames").value);
+
+    const algorithms = [
+        { name: "FIFO", frames: [], pageFaults: 0, pageHits: 0, frameIndex: 0, stepFrames: [], hitOrFault: [] },
+        { name: "LRU", frames: [], pageFaults: 0, pageHits: 0, stepFrames: [], hitOrFault: [] },
+        { name: "Optimal", frames: [], pageFaults: 0, pageHits: 0, stepFrames: [], hitOrFault: [] },
+    ];
+
+    const visualizationSection = document.getElementById("visualizationSection");
+    visualizationSection.innerHTML = "";
+
+    // Run simulation for each algorithm
+    algorithms.forEach((alg) => {
+        simulateAlgorithm(referenceString, numFrames, alg);
+        displayVisualization(alg, numFrames, referenceString);
+    });
+
+    // Call the efficiency analysis after the simulations are complete
+    displayEfficiencyAnalysis(algorithms, referenceString.length);
+}
+
+function simulateAlgorithm(referenceString, numFrames, alg) {
+    const frames = alg.frames;
+    let pageFaults = 0;
+    let pageHits = 0;
+
+    referenceString.forEach((page, step) => {
+        let hit = false;
+
+        // Check if the page is already in the frames
+        if (frames.includes(page)) {
+            hit = true;
+            pageHits++;
+            alg.hitOrFault.push({ result: 'hit', page, step }); // Track hit
+        } else {
+            // Page fault: Insert the new page
+            if (frames.length < numFrames) {
+                frames.push(page);
+            } else {
+                if (alg.name === "FIFO") {
+                    frames[alg.frameIndex] = page;
+                    alg.frameIndex = (alg.frameIndex + 1) % numFrames; // FIFO logic
+                } else if (alg.name === "LRU") {
+                    const lruIndex = findLRUPageIndex(frames, referenceString, step);
+                    frames[lruIndex] = page;
+                } else if (alg.name === "Optimal") {
+                    const optIndex = findOptimalPageIndex(frames, referenceString, step);
+                    frames[optIndex] = page;
+                }
+            }
+            pageFaults++;
+            alg.hitOrFault.push({ result: 'fault', page, step }); // Track fault
+        }
+
+        // Store the frame state at this step
+        alg.stepFrames.push([...frames]);
+
+        // Record the hits and faults
+        alg.pageHits = pageHits;
+        alg.pageFaults = pageFaults;
+    });
+}
+
+
+function displayVisualization(alg, numFrames, referenceString) {
+    const visualizationSection = document.getElementById("visualizationSection");
+    
+    const algContainer = document.createElement("div");
+    algContainer.classList.add("alg-container");
+
+    // Display the algorithm name
+    const algTitle = document.createElement("h2");
+    algTitle.textContent = alg.name + " Page Replacement Algorithm";
+    algTitle.classList.add("alg-title", "text-2xl", "font-bold", "text-white", "mt-8", "text-center");
+    algContainer.appendChild(algTitle);
+
+    // Splitting reference string into chunks of 15
+    const chunkSize = 15;
+    const chunks = [];
+    for (let i = 0; i < referenceString.length; i += chunkSize) {
+        chunks.push(referenceString.slice(i, i + chunkSize));
+    }
+
+    // Loop through each chunk and create a new table
+    chunks.forEach((chunk, chunkIndex) => {
+        // Display the reference string in a horizontal row
+        const referenceRow = document.createElement("div");
+        referenceRow.classList.add("reference-row-horizontal");
+
+        chunk.forEach((ref) => {
+            const referenceCell = document.createElement("div");
+            referenceCell.classList.add("reference-cell");
+            referenceCell.textContent = ref;
+            referenceRow.appendChild(referenceCell);
+        });
+
+        algContainer.appendChild(referenceRow);
+
+        // Create a table-like structure to visualize frames per reference string
+        const table = document.createElement("div");
+        table.classList.add("frame-table");
+
+        // Create rows for each frame
+        for (let i = 0; i < numFrames; i++) {
+            const frameRow = document.createElement("div");
+            frameRow.classList.add("frame-row");
+
+            chunk.forEach((_, stepIndex) => {
+                const globalStepIndex = chunkIndex * chunkSize + stepIndex; // Get the actual step index from the full reference string
+                if (globalStepIndex >= alg.stepFrames.length) return;
+
+                const frameCell = document.createElement("div");
+                frameCell.classList.add("frame-cell");
+
+                // Only highlight the element causing hit or fault for that step
+                const stepFrame = alg.stepFrames[globalStepIndex];
+                const stepInfo = alg.hitOrFault[globalStepIndex];
+
+                if (stepFrame[i] !== undefined) {
+                    frameCell.textContent = stepFrame[i];
+                    if (stepInfo && stepInfo.page === stepFrame[i]) {
+                        frameCell.classList.add(stepInfo.result === 'hit' ? 'hit' : 'fault');
+                    }
+                } else {
+                    frameCell.textContent = "-";
+                }
+
+                frameRow.appendChild(frameCell);
+            });
+
+            table.appendChild(frameRow);
+        }
+
+        algContainer.appendChild(table);
+    });
+
+    // Display the result stats (hits, faults, hit ratio, fault ratio)
+    const resultSection = document.createElement("div");
+    resultSection.classList.add("result-section");
+    const hitRatio = (alg.pageHits / referenceString.length).toFixed(2);
+    const faultRatio = (alg.pageFaults / referenceString.length).toFixed(2);
+
+    resultSection.innerHTML = `
+        <p style="color: green;">Number of Hits: ${alg.pageHits}</p>
+        <p style="color: red;">Page Faults: ${alg.pageFaults}</p>
+        <p>Hit Rate: ${(hitRatio * 100).toFixed(2)}%</p>
+        <p>Fault Rate: ${(faultRatio * 100).toFixed(2)}%</p>
+    `;
+
+    algContainer.appendChild(resultSection);
+    visualizationSection.appendChild(algContainer);
+}
+
+
+function displayEfficiencyAnalysis(algorithms, referenceStringLength) {
+    const efficiencySection = document.getElementById("efficiencySection");
+    efficiencySection.innerHTML = ""; // Clear previous content
+
+    // Create a title for the section
+    const title = document.createElement("h2");
+    title.textContent = "Algorithm Efficiency Analysis";
+    title.classList.add("text-2xl", "font-bold", "text-white", "mt-8", "text-center");
+    efficiencySection.appendChild(title);
+
+    // Sort algorithms by page faults (lower page faults = higher efficiency)
+    const sortedAlgorithms = [...algorithms].sort((a, b) => a.pageFaults - b.pageFaults);
+
+    // Assign efficiency classes based on the order of algorithms
+    sortedAlgorithms[0].efficiencyClass = 'high-efficiency';   // Best
+    sortedAlgorithms[1].efficiencyClass = 'medium-efficiency'; // Medium
+    sortedAlgorithms[2].efficiencyClass = 'low-efficiency';    // Least
+
+    sortedAlgorithms.forEach((alg) => {
+        // Ensure we avoid division by zero and display efficiency correctly
+        const efficiencyPercentage = referenceStringLength > 0 
+            ? (1 - (alg.pageFaults / referenceStringLength)) * 100
+            : 0;
+
+        const efficiencyBox = document.createElement("div");
+        efficiencyBox.classList.add("efficiency-box", alg.efficiencyClass);
+        efficiencyBox.innerHTML = `
+            <p>${alg.name} Algorithm</p>
+            <p>Efficiency: ${efficiencyPercentage.toFixed(2)}%</p>
+        `;
+
+        efficiencySection.appendChild(efficiencyBox);
+    });
+}
+
+// Helper functions to calculate the page index for LRU and Optimal
+function findLRUPageIndex(frames, referenceString, currentIndex) {
+    const lastUsed = frames.map(frame => referenceString.slice(0, currentIndex).lastIndexOf(frame));
+    return lastUsed.indexOf(Math.min(...lastUsed));
+}
+
+function findOptimalPageIndex(frames, referenceString, currentIndex) {
+    const futureUses = frames.map(frame => referenceString.slice(currentIndex + 1).indexOf(frame));
+    const farthestUsed = futureUses.map(use => (use === -1 ? Infinity : use));
+    return farthestUsed.indexOf(Math.max(...farthestUsed));
+}
+
+    </script>
+</body>
+</html>
